@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI 多語系口說老師 - GitHub 版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .pulse-mic { animation: mic-pulse 1.5s infinite; }
+        @keyframes mic-pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .diff-correct { color: #4ade80; font-weight: 600; }
+        .transition-all { transition: all 0.3s ease; }
+        button { touch-action: manipulation; }
+    </style>
+</head>
+<body class="min-h-screen p-4 flex flex-col items-center">
+
+    <div class="max-w-4xl w-full space-y-4">
+        <!-- 狀態診斷 -->
+        <div id="env-check" class="bg-blue-500/10 border border-blue-500/30 text-blue-200 p-3 rounded-lg text-[10px] flex justify-between">
+            <span id="https-status">檢查中...</span>
+            <span id="mic-status">麥克風未授權</span>
+        </div>
+
+        <!-- 設定區域 -->
+        <section id="setup-section" class="glass-card rounded-2xl p-6 shadow-xl space-y-6">
+            <h1 class="text-2xl font-bold text-center flex items-center justify-center gap-2">
+                <span>🤖</span> AI 多語系老師
+            </h1>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-300">1. 選擇教學語言</label>
+                    <select id="lang-select" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="en-US">英語 (English)</option>
+                        <option value="ja-JP">日語 (日本語)</option>
+                        <option value="ko-KR">韓語 (한국어)</option>
+                    </select>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-300">2. 練習模式</label>
+                    <select id="mode-select" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="shadow">跟讀模式 (Shadowing)</option>
+                        <option value="dialogue">對話模式 (Dialogue)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-slate-300">3. 對話內容 (A: 老師, B: 學生)</label>
+                <textarea id="script-input" class="w-full h-32 bg-slate-900 border border-slate-700 rounded-xl p-4 text-slate-200" placeholder="A: Hello!&#10;B: Hi teacher!"></textarea>
+            </div>
+
+            <button id="start-btn" class="w-full bg-blue-600 py-4 rounded-full font-bold hover:bg-blue-500 transition-all shadow-lg active:scale-95">
+                點此授權並開始練習
+            </button>
+        </section>
+
+        <!-- 練習區域 -->
+        <section id="practice-section" class="hidden space-y-4">
+            <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                <div id="progress-bar" class="bg-blue-500 h-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+
+            <div class="glass-card rounded-3xl p-6 shadow-2xl relative">
+                <div class="flex justify-between items-start mb-6">
+                    <button id="prev-step" class="p-2 text-slate-400 hover:text-white disabled:opacity-30" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    
+                    <div class="flex flex-col items-center">
+                        <div id="teacher-avatar" class="w-16 h-16 rounded-full bg-slate-800 border-2 border-blue-500 flex items-center justify-center text-2xl transition-all">👨‍🏫</div>
+                        <div id="teacher-bubble" class="mt-2 text-[10px] font-bold text-blue-400 uppercase tracking-widest text-center">準備中</div>
+                    </div>
+
+                    <button id="next-step" class="p-2 text-slate-400 hover:text-white disabled:opacity-30">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                </div>
+
+                <div id="target-sentence" class="text-2xl md:text-3xl text-center font-medium min-h-[120px] flex items-center justify-center px-4 leading-snug">載入中...</div>
+
+                <div id="mic-overlay" class="hidden flex flex-col items-center space-y-4 mt-8">
+                    <div id="mic-btn" class="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center pulse-mic cursor-pointer active:scale-90 transition-all shadow-xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19v3m-4-3h8m-4-11a3 3 0 013 3v5a3 3 0 11-6 0V8a3 3 0 013-3z" /></svg>
+                    </div>
+                    <button id="manual-submit" class="text-blue-400 text-sm font-semibold p-2">說完了，點此手動送出</button>
+                </div>
+
+                <div id="result-area" class="hidden mt-8 pt-6 border-t border-slate-700 space-y-6">
+                    <div id="comparison-display" class="text-lg text-center leading-relaxed"></div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button id="play-sys" class="bg-slate-800 py-3 rounded-xl text-xs flex flex-col items-center gap-1">🎧 標準</button>
+                        <button id="play-user" class="bg-blue-600/20 py-3 rounded-xl text-xs flex flex-col items-center gap-1
