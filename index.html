@@ -2,100 +2,572 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 多語系口說老師 - GitHub 版</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#121212">
+    <title>AI 口說練習教練 App</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
-        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .pulse-mic { animation: mic-pulse 1.5s infinite; }
-        @keyframes mic-pulse {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-            70% { transform: scale(1.1); box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        :root {
+            --bg-color: #121212; --surface-color: #1E1E1E;
+            --primary-color: #00E676; --secondary-color: #29B6F6;
+            --text-primary: #FFFFFF; --text-secondary: #B0B0B0;
+            --error-color: #FF5252; --success-color: #69F0AE;
+            --border-radius-lg: 24px; --border-radius-md: 16px; --border-radius-sm: 8px;
         }
-        .diff-correct { color: #4ade80; font-weight: 600; }
-        .transition-all { transition: all 0.3s ease; }
-        button { touch-action: manipulation; }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            margin: 0; padding: 0; font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            background-color: var(--bg-color); color: var(--text-primary);
+            display: flex; flex-direction: column; height: 100vh; height: -webkit-fill-available;
+            overflow: hidden; touch-action: manipulation;
+        }
+
+        /* Navbar / App Header */
+        #app-header {
+            display: flex; justify-content: space-between; align-items: center;
+            height: 60px; padding: 0 16px; padding-top: env(safe-area-inset-top);
+            background-color: var(--surface-color); border-bottom: 1px solid rgba(255,255,255,0.05);
+            z-index: 100; flex-shrink: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .header-title { font-weight: 600; font-size: 1.1rem; color: var(--text-primary); }
+
+        select, button {
+            background-color: var(--surface-color); color: var(--text-primary);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: var(--border-radius-sm);
+            font-size: 1rem; cursor: pointer; outline: none; transition: 0.2s ease;
+        }
+        
+        select { padding: 6px 4px; font-size: 0.85rem; max-width: 120px; }
+        
+        button { background-color: var(--secondary-color); color: #000; font-weight: 600; border: none; padding: 10px 16px; }
+        button:active { transform: scale(0.95); opacity: 0.8; }
+        button.primary { background-color: var(--primary-color); }
+        button.icon-btn { background: transparent; color: var(--text-primary); border: none; font-size: 1.5rem; padding: 8px; }
+
+        /* Drawer / 側邊目錄 */
+        #drawer-backdrop {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px);
+            z-index: 1999; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        #drawer-backdrop.active { opacity: 1; pointer-events: auto; }
+
+        #drawer {
+            position: fixed; top: 0; left: -100%; width: 280px; height: 100vh;
+            background-color: var(--surface-color); z-index: 2000;
+            transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            display: flex; flex-direction: column; overflow-y: auto;
+            padding: env(safe-area-inset-top) 20px 20px 20px; box-shadow: 2px 0 15px rgba(0,0,0,0.5);
+        }
+        #drawer.open { left: 0; }
+        
+        .drawer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; margin-top:10px; }
+        .drawer-title { font-size: 1.2rem; font-weight: bold; color: var(--secondary-color); }
+        
+        #lesson-list { list-style: none; padding: 0; margin: 0; flex-grow: 1; }
+        .lesson-item {
+            padding: 14px 16px; margin-bottom: 8px; background-color: rgba(255,255,255,0.03);
+            border-radius: var(--border-radius-md); font-size: 0.95rem; line-height: 1.4;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .lesson-item.active { background-color: rgba(41, 182, 246, 0.15); border-left: 4px solid var(--secondary-color); }
+        .lesson-item .score { font-size: 0.8rem; color: var(--success-color); font-weight: bold; white-space: nowrap; margin-left: 10px; }
+
+        /* 內容區 */
+        #interaction-area { 
+            flex-grow: 1; display: flex; flex-direction: column; padding: 20px 16px; 
+            overflow-y: auto; scroll-behavior: smooth;
+        }
+        .bubble-container { width: 100%; max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; padding-bottom: 20px; }
+        
+        .bubble {
+            max-width: 85%; padding: 16px 20px; border-radius: var(--border-radius-lg); font-size: 1.4rem; line-height: 1.5;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15); animation: popIn 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+            word-break: break-word; white-space: pre-wrap;
+        }
+        @keyframes popIn { 0% { opacity: 0; transform: scale(0.9) translateY(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+        
+        .bubble.ai { align-self: flex-start; background-color: var(--surface-color); border-bottom-left-radius: 4px; }
+        .bubble.user { align-self: flex-end; background: rgba(41,182,246,0.15); border: 1px solid rgba(41,182,246,0.3); border-bottom-right-radius: 4px; }
+        .bubble-label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 6px; padding: 0 4px; }
+
+        ruby { ruby-position: over; }
+        rt { font-size: 0.65em; color: var(--secondary-color); font-weight: normal; user-select: none; }
+
+        .diff-error { color: var(--error-color); text-decoration: underline wavy; font-weight: 600; }
+        .diff-correct { color: var(--text-primary); }
+
+        /* 底部控制區 (Bottom Navigation) */
+        #bottom-controls { 
+            background: var(--surface-color); padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom));
+            border-top: 1px solid rgba(255,255,255,0.05); box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+            display: flex; flex-direction: column; align-items: center; z-index: 100; flex-shrink: 0;
+        }
+        
+        #visualizer { display: flex; gap: 4px; height: 30px; margin-bottom: 10px; opacity: 0; transition: 0.3s; }
+        #visualizer.active { opacity: 1; }
+        .bar { width: 4px; height: 10px; border-radius: 2px; background-color: var(--primary-color); transition: height 0.1s; }
+        #visualizer.speaking .bar { background-color: var(--secondary-color); }
+        
+        #status-text { font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 12px; height: 20px; font-weight: 600; text-align: center; }
+
+        /* 大錄音按鈕 */
+        #record-btn {
+            width: 100%; max-width: 400px; padding: 18px; font-size: 1.2rem; border-radius: var(--border-radius-lg);
+            display: flex; justify-content: center; align-items: center; gap: 10px; font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0, 230, 118, 0.3); transition: all 0.3s ease;
+        }
+        #record-btn.recording { background-color: var(--error-color); box-shadow: 0 4px 20px rgba(255, 82, 82, 0.5); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
+
+        /* 操作面板 */
+        .controls-row { display: flex; gap: 10px; width: 100%; max-width: 400px; justify-content: space-between; display: none; margin-top: 10px; }
+        .controls-row.visible { display: flex; }
+        .ctrl-btn { flex: 1; padding: 14px 0; border-radius: var(--border-radius-sm); font-size: 1.2rem; background: rgba(255,255,255,0.08); color: var(--text-primary); display:flex; flex-direction:column; align-items:center; gap:4px; }
+        .ctrl-btn span { font-size: 0.7rem; font-weight: normal; color: var(--text-secondary); }
+        .ctrl-btn.highlight { background: rgba(41,182,246,0.2); border: 1px solid rgba(41,182,246,0.4); color: var(--secondary-color); }
+
+        /* 全螢幕覆蓋設定 (Splash / Setup) */
+        #setup-overlay { 
+            position: fixed; inset: 0; background: var(--bg-color); z-index: 9999; 
+            display: flex; flex-direction: column; overflow-y: auto; padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom) 20px;
+        }
+        .setup-card { background: var(--surface-color); padding: 30px 20px; border-radius: var(--border-radius-lg); margin: auto 0; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        .setup-card h2 { color: var(--primary-color); margin-top: 0; text-align: center; font-size: 1.8rem; margin-bottom: 24px; }
+        
+        textarea { 
+            width: 100%; height: 180px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); 
+            color: var(--text-primary); padding: 16px; border-radius: var(--border-radius-md); font-size: 1rem; margin-bottom: 20px; outline: none;
+        }
+        textarea:focus { border-color: var(--secondary-color); }
+        
+        .setting-group { margin-bottom: 20px; }
+        .setting-group label { display: block; margin-bottom: 10px; font-weight: 500; font-size: 0.95rem; }
+        .setting-group select { width: 100%; max-width: 100%; padding: 12px; font-size: 1.1rem; border-radius: var(--border-radius-md); background: rgba(0,0,0,0.3); }
+        
+        .mode-options { display: flex; flex-direction: column; gap: 12px; }
+        .mode-option-label { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.05); padding: 14px; border-radius: var(--border-radius-md); }
+        input[type="radio"] { transform: scale(1.3); accent-color: var(--primary-color); }
+
+        .hidden { display: none !important; }
     </style>
 </head>
-<body class="min-h-screen p-4 flex flex-col items-center">
+<body>
 
-    <div class="max-w-4xl w-full space-y-4">
-        <!-- 狀態診斷 -->
-        <div id="env-check" class="bg-blue-500/10 border border-blue-500/30 text-blue-200 p-3 rounded-lg text-[10px] flex justify-between">
-            <span id="https-status">檢查中...</span>
-            <span id="mic-status">麥克風未授權</span>
+    <!-- 啟動與設定畫面 -->
+    <div id="setup-overlay">
+        <div class="setup-card">
+            <h2>AI 口說特訓</h2>
+            
+            <div class="setting-group">
+                <label>目標學習語言：</label>
+                <select id="lang-select">
+                    <option value="en-US">英文 (English)</option>
+                    <option value="ja-JP">日文 (日本語)</option>
+                    <option value="ko-KR">韓文 (한국어)</option>
+                </select>
+            </div>
+
+            <textarea id="materials-input" placeholder="可貼上中日/中英對照句，例如：&#10;今日はいい天気ですね。&#10;B: 明日は雨が降るかもしれません。"></textarea>
+            
+            <div class="setting-group mode-options">
+                <label class="mode-option-label"><input type="radio" name="mode" value="shadowing" checked> 影子跟讀 (逐句跟唸)</label>
+                <label class="mode-option-label"><input type="radio" name="mode" value="dialogue"> 實戰對話 (扮演B角色)</label>
+                <label class="mode-option-label"><input type="radio" name="mode" value="test"> 盲測試煉 (遮蔽題庫字幕)</label>
+            </div>
+            
+            <button class="primary" id="start-btn" style="width:100%; padding:18px; font-size:1.2rem; border-radius:var(--border-radius-lg); margin-top:10px;">啟動教練 (需麥克風權限)</button>
+        </div>
+    </div>
+
+    <!-- 左側目錄抽屜 Drawer -->
+    <div id="drawer-backdrop"></div>
+    <div id="drawer">
+        <div class="drawer-header">
+            <div class="drawer-title">📋 課程進度</div>
+            <button class="icon-btn" id="close-drawer-btn">×</button>
+        </div>
+        <ul id="lesson-list"></ul>
+    </div>
+
+    <!-- App 頂部列 -->
+    <header id="app-header">
+        <button class="icon-btn" id="menu-btn" style="padding-left:0;">☰</button>
+        <div class="header-title">口說教練</div>
+        <select id="voice-select"></select>
+    </header>
+
+    <!-- 內容區 -->
+    <div id="interaction-area">
+        <div class="bubble-container" id="chat-container"></div>
+    </div>
+
+    <!-- 固定底部操作區 -->
+    <div id="bottom-controls">
+        <div id="status-text">系統準備中</div>
+        <div id="visualizer"></div>
+        
+        <button id="record-btn" class="primary hidden">🎤 點擊開始錄音</button>
+        
+        <!-- 錄音後出現的多功能控制列 -->
+        <div class="controls-row" id="controls-row">
+            <button class="ctrl-btn" id="prev-btn">⏮<span>上一句</span></button>
+            <button class="ctrl-btn" id="play-my-btn">▶️<span>聽自己</span></button>
+            <button class="ctrl-btn" id="play-ai-btn">🔊<span>聽 AI</span></button>
+            <button class="ctrl-btn highlight" id="next-btn">⏭<span>下一句</span></button>
+        </div>
+        <div style="display:flex; justify-content:center; gap:20px; width:100%; max-width:400px; margin-top:10px;" id="extra-ctrls" class="hidden">
+            <button class="ctrl-btn" style="flex:1" id="retry-btn">🔄<span>重試本句</span></button>
+            <button class="ctrl-btn" style="flex:1" id="download-btn">💾<span>下載錄音</span></button>
         </div>
 
-        <!-- 設定區域 -->
-        <section id="setup-section" class="glass-card rounded-2xl p-6 shadow-xl space-y-6">
-            <h1 class="text-2xl font-bold text-center flex items-center justify-center gap-2">
-                <span>🤖</span> AI 多語系老師
-            </h1>
+        <audio id="audio-playback" style="display:none;"></audio>
+    </div>
+
+    <script>
+        const state = {
+            mode: 'shadowing', lang: 'en-US', lessons: [], currentIndex: 0,
+            isRecording: false, recognition: null, synthesis: window.speechSynthesis,
+            voices: [], selectedVoice: null, mediaRecorder: null, audioChunks: [], audioBlob: null
+        };
+
+        const els = {
+            overlay: document.getElementById('setup-overlay'), materials: document.getElementById('materials-input'),
+            start: document.getElementById('start-btn'), list: document.getElementById('lesson-list'),
+            chat: document.getElementById('chat-container'), status: document.getElementById('status-text'),
+            vis: document.getElementById('visualizer'), record: document.getElementById('record-btn'),
+            ctrlRow: document.getElementById('controls-row'), extraCtrls: document.getElementById('extra-ctrls'),
+            prev: document.getElementById('prev-btn'), next: document.getElementById('next-btn'), 
+            retry: document.getElementById('retry-btn'), dl: document.getElementById('download-btn'),
+            playMy: document.getElementById('play-my-btn'), playAi: document.getElementById('play-ai-btn'),
+            voice: document.getElementById('voice-select'), audio: document.getElementById('audio-playback'),
+            lang: document.getElementById('lang-select'),
+            drawer: document.getElementById('drawer'), drawerBd: document.getElementById('drawer-backdrop'),
+            menuBtn: document.getElementById('menu-btn'), closeDrawer: document.getElementById('close-drawer-btn')
+        };
+
+        // UI Helpers
+        function toggleDrawer(force) {
+            let open = force !== undefined ? force : !els.drawer.classList.contains('open');
+            els.drawer.classList.toggle('open', open);
+            els.drawerBd.classList.toggle('active', open);
+        }
+        els.menuBtn.onclick = () => toggleDrawer();
+        els.closeDrawer.onclick = () => toggleDrawer(false);
+        els.drawerBd.onclick = () => toggleDrawer(false);
+
+        // 聲波動畫
+        for(let i=0; i<15; i++) els.vis.innerHTML += '<div class="bar"></div>';
+        let visInt;
+        function setVis(mode) {
+            if(!mode) { clearInterval(visInt); els.vis.className=''; return; }
+            els.vis.className=`active ${mode}`;
+            visInt = setInterval(() => {
+                document.querySelectorAll('.bar').forEach(b => b.style.height = `${Math.random()*20+5}px`);
+            }, 100);
+        }
+
+        // TTS
+        async function initTTS() {
+            let prefix = state.lang.split('-')[0]; // en, ja, ko
+            let voices = state.synthesis.getVoices();
+            if(!voices.length) await new Promise(r => state.synthesis.onvoiceschanged = () => r());
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="space-y-2">
-                    <label class="text-sm font-medium text-slate-300">1. 選擇教學語言</label>
-                    <select id="lang-select" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
-                        <option value="en-US">英語 (English)</option>
-                        <option value="ja-JP">日語 (日本語)</option>
-                        <option value="ko-KR">韓語 (한국어)</option>
-                    </select>
-                </div>
-                <div class="space-y-2">
-                    <label class="text-sm font-medium text-slate-300">2. 練習模式</label>
-                    <select id="mode-select" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
-                        <option value="shadow">跟讀模式 (Shadowing)</option>
-                        <option value="dialogue">對話模式 (Dialogue)</option>
-                    </select>
-                </div>
-            </div>
+            voices = state.synthesis.getVoices().filter(v => v.lang.startsWith(prefix));
+            els.voice.innerHTML = '';
+            
+            if (prefix === 'en') {
+                let males = voices.filter(v => v.name.match(/David|Mark|Guy|Ryan|Male/i));
+                let females = voices.filter(v => v.name.match(/Zira|Jenny|Hazel|Sonia|Female/i));
+                let others = voices.filter(v => !males.includes(v) && !females.includes(v));
+                
+                while(males.length < 2 && others.length > 0) males.push(others.shift());
+                while(females.length < 2 && others.length > 0) females.push(others.shift());
+                
+                let voiceList = [];
+                males.slice(0, 2).forEach(v => voiceList.push({ v: v, label: v.name.substring(0,18) + ' (👨)' }));
+                females.slice(0, 2).forEach(v => voiceList.push({ v: v, label: v.name.substring(0,18) + ' (👩)' }));
+                
+                state.voices = voiceList.map(x => x.v);
+                state.selectedVoice = state.voices[0];
+                voiceList.forEach((item, i) => els.voice.appendChild(new Option(item.label, i)));
+            } else {
+                voices.sort((a,b) => {
+                    let scoreA = (a.name.match(/natural/i)?10:0) + (a.name.match(/google/i)?5:0) + (a.name.match(/microsoft/i)?3:0);
+                    let scoreB = (b.name.match(/natural/i)?10:0) + (b.name.match(/google/i)?5:0) + (b.name.match(/microsoft/i)?3:0);
+                    return scoreB - scoreA;
+                });
+                state.voices = voices; 
+                state.selectedVoice = voices[0];
+                voices.forEach((v,i) => els.voice.appendChild(new Option(v.name.substring(0,18), i)));
+            }
+            els.voice.onchange = (e) => state.selectedVoice = state.voices[e.target.value];
+        }
 
-            <div class="space-y-2">
-                <label class="block text-sm font-medium text-slate-300">3. 對話內容 (A: 老師, B: 學生)</label>
-                <textarea id="script-input" class="w-full h-32 bg-slate-900 border border-slate-700 rounded-xl p-4 text-slate-200" placeholder="A: Hello!&#10;B: Hi teacher!"></textarea>
-            </div>
+        function speak(text, rate=0.95, pitch=1.1) {
+            return new Promise(res => {
+                state.synthesis.cancel();
+                let u = new SpeechSynthesisUtterance(text);
+                if(state.selectedVoice) u.voice = state.selectedVoice;
+                u.lang = state.lang;
+                u.rate = rate; u.pitch = pitch;
+                u.onstart = () => { setStatus('AI 老師說話中...'); setVis('speaking'); };
+                u.onend = u.onerror = () => { setVis(); res(); };
+                state.synthesis.speak(u);
+            });
+        }
 
-            <button id="start-btn" class="w-full bg-blue-600 py-4 rounded-full font-bold hover:bg-blue-500 transition-all shadow-lg active:scale-95">
-                點此授權並開始練習
-            </button>
-        </section>
+        // STT & Mic
+        function initSTT() {
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if(!SR) return false;
+            state.recognition = new SR();
+            state.recognition.continuous = true; state.recognition.interimResults = true; 
+            state.recognition.lang = state.lang;
+            
+            let finalStr = '';
+            state.recognition.onresult = e => {
+                let interim = ''; finalStr = '';
+                for(let i=e.resultIndex; i<e.results.length; i++) {
+                    if(e.results[i].isFinal) finalStr += e.results[i][0].transcript;
+                    else interim += e.results[i][0].transcript;
+                }
+                updateUserBubble(finalStr || interim);
+            };
+            return true;
+        }
 
-        <!-- 練習區域 -->
-        <section id="practice-section" class="hidden space-y-4">
-            <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                <div id="progress-bar" class="bg-blue-500 h-full transition-all duration-500" style="width: 0%"></div>
-            </div>
+        async function initMic() {
+            try {
+                let stream = await navigator.mediaDevices.getUserMedia({audio:true});
+                state.mediaRecorder = new MediaRecorder(stream);
+                state.mediaRecorder.ondataavailable = e => { if(e.data.size>0) state.audioChunks.push(e.data); };
+                state.mediaRecorder.onstop = () => { 
+                    state.audioBlob = new Blob(state.audioChunks, {type:'audio/webm'}); 
+                    state.audioChunks=[]; 
+                };
+                return true;
+            } catch { alert('這是一個語音學習 App，請允許麥克風權限才能開始！'); return false; }
+        }
 
-            <div class="glass-card rounded-3xl p-6 shadow-2xl relative">
-                <div class="flex justify-between items-start mb-6">
-                    <button id="prev-step" class="p-2 text-slate-400 hover:text-white disabled:opacity-30" disabled>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
-                    </button>
-                    
-                    <div class="flex flex-col items-center">
-                        <div id="teacher-avatar" class="w-16 h-16 rounded-full bg-slate-800 border-2 border-blue-500 flex items-center justify-center text-2xl transition-all">👨‍🏫</div>
-                        <div id="teacher-bubble" class="mt-2 text-[10px] font-bold text-blue-400 uppercase tracking-widest text-center">準備中</div>
-                    </div>
+        function toggleRecord() {
+            if(state.isRecording) {
+                state.isRecording = false; setVis();
+                els.record.innerHTML = '🎤 點擊開始錄音';
+                els.record.classList.remove('recording');
+                try { state.recognition.stop(); state.mediaRecorder.stop(); } catch(e){}
+                setStatus('分析發音中...'); setTimeout(analyzeResult, 800);
+            } else {
+                state.isRecording = true; state.audioChunks = []; els.ctrlRow.classList.remove('visible');
+                els.extraCtrls.classList.add('hidden'); createUserBubble();
+                els.record.innerHTML = '🛑 錄音中...點擊結束';
+                els.record.classList.add('recording');
+                setVis('listening'); setStatus('請開始說話...');
+                try { state.recognition.start(); state.mediaRecorder.start(); } catch(e){}
+            }
+        }
 
-                    <button id="next-step" class="p-2 text-slate-400 hover:text-white disabled:opacity-30">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-                    </button>
-                </div>
+        // Kuroshiro (Kanji to Furigana)
+        let kuroshiro = null;
+        async function initKuroshiro() {
+            if (kuroshiro) return;
+            if (typeof window.Kuroshiro === 'undefined') {
+                await new Promise((resolve, reject) => {
+                    let s1 = document.createElement('script');
+                    s1.src = "https://cdn.jsdelivr.net/npm/kuroshiro@1.2.0/build/kuroshiro.min.js";
+                    s1.onload = () => {
+                        let s2 = document.createElement('script');
+                        s2.src = "https://cdn.jsdelivr.net/npm/kuroshiro-analyzer-kuromoji@1.1.0/build/kuroshiro-analyzer-kuromoji.min.js";
+                        s2.onload = resolve; s2.onerror = reject;
+                        document.head.appendChild(s2);
+                    };
+                    s1.onerror = reject; document.head.appendChild(s1);
+                });
+            }
+            kuroshiro = new window.Kuroshiro();
+            await kuroshiro.init(new window.KuromojiAnalyzer({ dictPath: "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict" }));
+        }
 
-                <div id="target-sentence" class="text-2xl md:text-3xl text-center font-medium min-h-[120px] flex items-center justify-center px-4 leading-snug">載入中...</div>
+        // Lessons Core
+        async function loadLessons(text) {
+            let lines = text.split('\n').filter(l=>l.trim());
+            state.lessons = [];
+            for (let i = 0; i < lines.length; i++) {
+                let l = lines[i];
+                let m = l.trim().match(/^([A-Z])[:：]\s*(.*)$/i);
+                let role = m ? m[1].toUpperCase() : 'A';
+                let rawText = m ? m[2] : l;
+                let displayText = rawText;
+                
+                if (state.lang === 'ja-JP' && kuroshiro) {
+                    try { displayText = await kuroshiro.convert(rawText, { mode: "furigana", to: "hiragana" }); } 
+                    catch(e) { console.error("Furigana conversion error:", e); }
+                }
+                state.lessons.push({ id: i, role: role, text: rawText, displayText: displayText, score: 0 });
+            }
+            if(state.mode === 'test') state.lessons.sort(() => Math.random() - 0.5);
+            renderList();
+        }
 
-                <div id="mic-overlay" class="hidden flex flex-col items-center space-y-4 mt-8">
-                    <div id="mic-btn" class="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center pulse-mic cursor-pointer active:scale-90 transition-all shadow-xl">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19v3m-4-3h8m-4-11a3 3 0 013 3v5a3 3 0 11-6 0V8a3 3 0 013-3z" /></svg>
-                    </div>
-                    <button id="manual-submit" class="text-blue-400 text-sm font-semibold p-2">說完了，點此手動送出</button>
-                </div>
+        function renderList() {
+            els.list.innerHTML = '';
+            state.lessons.forEach((l,i) => {
+                let li = document.createElement('li');
+                li.className = `lesson-item ${i===state.currentIndex?'active':''}`;
+                li.onclick = () => { jumpTo(i); toggleDrawer(false); };
+                li.innerHTML = `<div>[${l.role}] ${state.mode==='test'?'(隨機考題) ':''}<br/>${l.text.substring(0,18)}...</div><div class="score" id="score-${i}">${l.score>0?'✅ '+l.score+'%':''}</div>`;
+                els.list.appendChild(li);
+            });
+        }
 
-                <div id="result-area" class="hidden mt-8 pt-6 border-t border-slate-700 space-y-6">
-                    <div id="comparison-display" class="text-lg text-center leading-relaxed"></div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <button id="play-sys" class="bg-slate-800 py-3 rounded-xl text-xs flex flex-col items-center gap-1">🎧 標準</button>
-                        <button id="play-user" class="bg-blue-600/20 py-3 rounded-xl text-xs flex flex-col items-center gap-1
+        async function jumpTo(i) {
+            if(i<0 || i>=state.lessons.length) return;
+            state.currentIndex = i; renderList(); els.chat.innerHTML=''; 
+            els.ctrlRow.classList.remove('visible'); els.extraCtrls.classList.add('hidden');
+            let item = state.lessons[i]; els.record.classList.add('hidden');
+            
+            let displayText = item.displayText || item.text;
+            if(state.mode === 'test') displayText = "❓ 測驗題：(文字已隱藏，請聽音回答)";
+
+            if(state.mode==='shadowing' || state.mode==='test' || item.role!=='B') {
+                addBubble('AI', displayText); 
+                await speak(item.text); 
+                if(state.mode==='dialogue' && item.role!=='B') { setTimeout(()=>jumpTo(i+1), 500); return; }
+            } else if (state.mode==='dialogue' && item.role==='B') {
+                els.chat.innerHTML += `<div class="bubble-label" style="text-align:center;color:var(--secondary-color);font-weight:bold;margin:10px 0;">請回答：${item.displayText || item.text}</div>`;
+            }
+            
+            els.record.classList.remove('hidden'); setStatus('輪到你了！請點擊錄音'); scroll();
+            
+            // 獨立展示導航供切換 (此時不顯示聽自己的聲音)
+            els.ctrlRow.classList.add('visible');
+            els.playMy.style.opacity = '0.3'; els.playMy.style.pointerEvents = 'none';
+            els.next.style.opacity = i<state.lessons.length-1 ? '1' : '0.3';
+            els.prev.style.opacity = i>0 ? '1' : '0.3';
+        }
+
+        // Diff Algorithm
+        function diffWords(target, user) {
+            let tw, uw, to;
+            if(state.lang === 'ja-JP' || state.lang === 'ko-KR') {
+                tw = target.replace(/[\s.,。、！？?!]/g,'').split(''); uw = user.replace(/[\s.,。、！？?!]/g,'').split(''); to = target.split('');
+            } else {
+                tw = target.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/); uw = user.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/); to = target.split(/\s+/);
+            }
+            let html=[], match=0, ui=0;
+            for(let i=0; i<tw.length; i++) {
+                if((state.lang === 'ja-JP' || state.lang === 'ko-KR') && to[i].match(/[\s.,。、！？?!]/)) {
+                    html.push(`<span class="diff-correct">${to[i]}</span>`); continue;
+                }
+                let found=false;
+                for(let j=ui; j<Math.min(ui+5, uw.length); j++) { if(uw[j]===tw[i]) { found=true; ui=j+1; break; } }
+                if(found) { html.push(`<span class="diff-correct">${to[i]}</span>`); match++; }
+                else html.push(`<span class="diff-error">${to[i]}</span>`);
+            }
+            return { score: Math.round((match/tw.length)*100)||0, html: html.join(state.lang.startsWith('en')?' ':'') };
+        }
+
+        async function analyzeResult() {
+            let item = state.lessons[state.currentIndex];
+            let bubbles = els.chat.querySelectorAll('.bubble.user');
+            if(!bubbles.length) return;
+            let last = bubbles[bubbles.length-1];
+            
+            let { score, html } = diffWords(item.text, last.textContent);
+            last.innerHTML = html;
+
+            if(state.mode === 'test') {
+                let aiBubbles = els.chat.querySelectorAll('.bubble.ai');
+                if(aiBubbles.length) aiBubbles[aiBubbles.length-1].innerHTML = `<span style="font-size:0.9rem;color:var(--success-color);">✔️ 解答:</span><br/>${item.displayText || item.text}`;
+            }
+            
+            if(score > item.score) {
+                item.score = score;
+                document.getElementById(`score-${state.currentIndex}`).textContent = `✅ ${score}%`;
+            }
+
+            let fbs = {
+                'en-US': { g: ["Excellent!", "Perfect pronunciation!"], b: ["Almost there, try again.", "Pay attention to the red parts."] },
+                'ja-JP': { g: ["素晴らしい！", "完璧ですね！"], b: ["惜しいですね、もう一度。"] },
+                'ko-KR': { g: ["훌륭해요!", "완벽합니다!"], b: ["다시 해볼까요?"] }
+            };
+            let fb = score>=80 ? fbs[state.lang].g : fbs[state.lang].b;
+            let t = fb[Math.floor(Math.random()*fb.length)];
+            
+            setStatus(`評分: ${score}%`); await speak(t, 1.05, 1.15);
+            
+            els.record.classList.add('hidden');
+            els.ctrlRow.classList.add('visible'); 
+            els.extraCtrls.classList.remove('hidden');
+            els.playMy.style.opacity = '1'; els.playMy.style.pointerEvents = 'auto'; // 錄音後解開
+        }
+
+        function addBubble(type, text) {
+            els.chat.innerHTML += `<div style="display:flex;flex-direction:column;align-items:${type==='AI'?'flex-start':'flex-end'};width:100%">
+                <div class="bubble-label">${type==='AI'?'🧑‍🏫 AI 老師':'👤 你'}</div>
+                <div class="bubble ${type.toLowerCase()} active-speech">${text}</div></div>`;
+            scroll();
+        }
+        function createUserBubble() { addBubble('user', '...'); }
+        function updateUserBubble(t) {
+            let b = els.chat.querySelectorAll('.bubble.user.active-speech');
+            if(b.length) b[b.length-1].textContent = t || '...'; scroll();
+        }
+        function scroll() { document.getElementById('interaction-area').scrollTop = document.getElementById('interaction-area').scrollHeight; }
+        function setStatus(t) { els.status.textContent = t; }
+
+        // Event Binding
+        els.start.onclick = async () => {
+            if(!els.materials.value.trim()) { alert('請貼上幾句對話才能開始喔！'); return; }
+            state.lang = els.lang.value; 
+            
+            els.start.disabled = true;
+            let origText = els.start.innerText;
+            els.start.innerText = "系統準備中，請稍候...";
+            
+            try {
+                await initTTS();
+                if(state.lang === 'ja-JP') {
+                    els.start.innerText = "載入日語發音字典中(初次需數秒)...";
+                    try { await initKuroshiro(); } catch(e) { console.warn("略過發音標記:", e); }
+                }
+                if(!(await initMic()) || !initSTT()) throw new Error("無麥克風權限");
+                state.mode = document.querySelector('input[name="mode"]:checked').value;
+                await loadLessons(els.materials.value); 
+                els.overlay.classList.add('hidden'); 
+                jumpTo(0);
+            } catch(e) {
+                if(e.message !== "無麥克風權限") alert('啟動錯誤：' + e);
+            } finally {
+                els.start.disabled = false;
+                els.start.innerText = origText;
+            }
+        };
+        
+        els.record.onclick = toggleRecord;
+        document.body.onkeyup = e => { if(e.code==='Space' && !els.record.classList.contains('hidden') && els.overlay.classList.contains('hidden')) toggleRecord(); };
+        
+        els.playMy.onclick = () => { if(state.audioBlob) { els.audio.src=URL.createObjectURL(state.audioBlob); els.audio.play(); }};
+        els.playAi.onclick = () => speak(state.lessons[state.currentIndex].text);
+        
+        els.dl.onclick = () => {
+            if(!state.audioBlob) return;
+            let a = document.createElement('a');
+            a.href = URL.createObjectURL(state.audioBlob); a.download = `voice_record_${Date.now()}.webm`;
+            a.click();
+        };
+
+        els.prev.onclick = () => jumpTo(state.currentIndex-1);
+        els.next.onclick = () => jumpTo(state.currentIndex+1);
+        els.retry.onclick = () => {
+            els.extraCtrls.classList.add('hidden');
+            els.playMy.style.opacity = '0.3'; els.playMy.style.pointerEvents = 'none';
+            els.record.classList.remove('hidden'); setStatus('請再次點擊錄音重試');
+        };
+
+    </script>
+</body>
+</html>
